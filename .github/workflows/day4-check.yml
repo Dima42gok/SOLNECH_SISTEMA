@@ -1,0 +1,63 @@
+name: Day4 Frontend Check
+on: push
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check templates
+        run: |
+          for f in base index events login register profile; do
+            test -f "templates/$f.html" && echo "PASS: $f.html" || { echo "FAIL: $f.html"; exit 1; }
+          done
+
+      - name: Check static
+        run: |
+          test -f static/css/style.css || { echo "FAIL: style.css"; exit 1; }
+          test -f static/js/main.js || { echo "FAIL: main.js"; exit 1; }
+          SIZE_CSS=$(wc -c < static/css/style.css)
+          SIZE_JS=$(wc -c < static/js/main.js)
+          echo "style.css bytes: $SIZE_CSS (need >= 300)"
+          echo "main.js bytes: $SIZE_JS (need >= 200)"
+          test "$SIZE_CSS" -ge 300 || { echo "FAIL: style.css too small"; exit 1; }
+          test "$SIZE_JS" -ge 200 || { echo "FAIL: main.js too small"; exit 1; }
+
+      - name: Check media queries in CSS
+        run: |
+          grep -q "@media" static/css/style.css && echo "PASS: media queries found" || { echo "FAIL: no media queries"; exit 1; }
+
+      - name: Check showNotification in JS
+        run: |
+          grep -q "showNotification" static/js/main.js && echo "PASS: showNotification found" || { echo "FAIL: no showNotification"; exit 1; }
+
+      - name: Check ARIA attributes in templates
+        run: |
+          grep -l "aria-label" templates/*.html && echo "PASS: aria-label found" || { echo "FAIL: no aria-label"; exit 1; }
+          grep -l "role=" templates/*.html && echo "PASS: role attribute found" || { echo "FAIL: no role attribute"; exit 1; }
+
+      - name: Check Dockerfile
+        run: |
+          grep -q "^FROM" Dockerfile && echo "PASS: FROM found" || { echo "FAIL: no FROM"; exit 1; }
+          grep -q "^COPY" Dockerfile && echo "PASS: COPY found" || { echo "FAIL: no COPY"; exit 1; }
+          grep -q "^CMD" Dockerfile && echo "PASS: CMD found" || { echo "FAIL: no CMD"; exit 1; }
+
+      - name: Check docker-compose.yml
+        run: |
+          grep -q "services" docker-compose.yml && echo "PASS: services found" || { echo "FAIL: no services"; exit 1; }
+          grep -q "postgres" docker-compose.yml && echo "PASS: postgres found" || { echo "FAIL: no postgres"; exit 1; }
+
+      - name: Check .dockerignore
+        run: |
+          test -f .dockerignore && echo "PASS: .dockerignore exists" || { echo "FAIL: no .dockerignore"; exit 1; }
+
+      - name: Syntax check Python
+        run: python -m py_compile app.py config.py models.py routes/*.py utils/*.py
+
+      - name: Build Docker image
+        run: docker build -t accessevent:check .
+
+      - name: Done
+        run: |
+          echo "PASS: Day4 Frontend Check completed"
