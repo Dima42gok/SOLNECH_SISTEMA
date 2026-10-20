@@ -1,8 +1,13 @@
 from ursina import *
 import math
 import random
+from pathlib import Path
+import os
 
-app = Ursina()
+# Ресурсы доступны при запуске из любой папки.
+os.chdir(Path(__file__).resolve().parent)
+
+app = Ursina(size=(1280, 720), development_mode=False)
 
 # ==========================================
 # 1. НАСТРОЙКИ КАЧЕСТВА
@@ -15,7 +20,6 @@ application.development_mode = False
 texture.default_filtering = 'trilinear' 
 
 # --- 2. Настройка сцены ---
-Sky(color=color.black)
 window.color = color.black
 
 # Камера смотрит на центр системы
@@ -34,7 +38,7 @@ for _ in range(2000):
 
 # --- 4. Солнце ---
 sun = Entity(model='sphere', scale=30, position=(0, 150, 0), texture='textures/2k_Солнце.jpg')
-sun_light = PointLight(parent=sun, color=color.rgba(255, 255, 200, 255), range=500)
+sun.unlit = True
 
 # --- 5. Данные планет ---
 # ВАЖНО: Мы изменили "скорость" на "период обращения в днях" (как в реальности)
@@ -54,9 +58,9 @@ planets = []
 
 for name, dist, size, period, tex_path in planets_data:
     try:
-        p = Entity(model='sphere', scale=size, texture=tex_path, unlit=False)
+        p = Entity(model='sphere', scale=size, texture=tex_path, unlit=True)
     except:
-        p = Entity(model='sphere', scale=size, color=color.white, unlit=False)
+        p = Entity(model='sphere', scale=size, color=color.white, unlit=True)
     
     p.name = name
     p.dist = dist
@@ -67,11 +71,12 @@ for name, dist, size, period, tex_path in planets_data:
     # Кольца Сатурна
     if name == "Сатурн":
         ring = Entity(
-            model='torus', 
-            scale=(size * 1.8, size * 0.1, size * 1.8), 
-            rotation_x=15, 
+            model=Mesh(vertices=[Vec3(math.cos(i * math.tau / 96) * r, 0, math.sin(i * math.tau / 96) * r) for i in range(97) for r in (0.7, 1.0)], triangles=[t for i in range(96) for t in ((2*i, 2*i+1, 2*i+2), (2*i+1, 2*i+3, 2*i+2))]), 
+            scale=0.9, 
+            rotation_x=15,
+            double_sided=True, 
             color=color.rgba(200, 180, 140, 150), 
-            unlit=False
+            unlit=True
         )
         ring.parent = p
         ring.position = (0, 0, 0)
@@ -88,7 +93,7 @@ def update():
     time_label.text = f"x{int(time_scale)}"
     
     # Базовое время: 1 "игровой" день проходит за 0.05 секунды при скорости 1x
-    # (Благодаря этому Нептун делает оборот примерно за 60 секунд)
+    # При скорости 1x оборот Нептуна занимает около 50 минут.
     days_per_second = 20 * time_scale
     
     for p in planets:
