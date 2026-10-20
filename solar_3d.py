@@ -29,20 +29,27 @@ camera.fov = 60
 
 EditorCamera()
 
-# --- 3. Звездное небо ---
-for _ in range(2000):
-    Entity(model='quad', color=color.white, 
-           scale=random.uniform(0.1, 0.4), 
-           position=(random.uniform(-800, 800), random.uniform(-800, 800), random.uniform(-800, 800)),
-           billboard=True, unlit=True)
+# --- 3. Звездное небо (ЗАМЕНЕНО НА КУБ, ЧТОБЫ НЕ БЫЛО КРУГОВ) ---
+try:
+    # Создаем огромный куб (скайбокс) с текстурой звезд
+    sky = Entity(
+        model='cube',            # Используем куб вместо сферы
+        scale=10000, 
+        texture='textures/2k_stars.jpg', 
+        double_sided=True,       # Текстура видна изнутри
+        unlit=True
+    )
+    # Отключаем сглаживание для звезд, чтобы они были четкими
+    sky.texture.filtering = 'nearest'
+except Exception as e:
+    print("Ошибка загрузки текстуры звезд:", e)
+    pass
 
 # --- 4. Солнце ---
 sun = Entity(model='sphere', scale=30, position=(0, 150, 0), texture='textures/2k_Солнце.jpg')
 sun.unlit = True
 
 # --- 5. Данные планет ---
-# ВАЖНО: Мы изменили "скорость" на "период обращения в днях" (как в реальности)
-# (Имя, Расстояние, Размер, Период в днях, Текстура)
 planets_data = [
     ("Меркурий", 40, 1.2, 88, 'textures/2k_Меркурий.jpg'),
     ("Венера", 60, 1.8, 225, 'textures/2k_Венера.jpg'),
@@ -55,6 +62,7 @@ planets_data = [
 ]
 
 planets = []
+moon = None  # Переменная для Луны
 
 for name, dist, size, period, tex_path in planets_data:
     try:
@@ -64,7 +72,7 @@ for name, dist, size, period, tex_path in planets_data:
     
     p.name = name
     p.dist = dist
-    p.period = period # Сохраняем период
+    p.period = period 
     p.angle = random.uniform(0, 360) 
     planets.append(p)
 
@@ -81,34 +89,48 @@ for name, dist, size, period, tex_path in planets_data:
         ring.parent = p
         ring.position = (0, 0, 0)
 
+    # === ЛУНА ДЛЯ ЗЕМЛИ ===
+    if name == "Земля":
+        try:
+            moon = Entity(
+                model='sphere', 
+                scale=0.6,                
+                texture='textures/2k_Луна.jpg', 
+                parent=p,                 
+                position=(0, 0, 0),       
+                unlit=True
+            )
+            moon.orbit_radius = 3.5       
+            moon.orbit_angle = 0          
+        except Exception as e:
+            print("Ошибка загрузки текстуры Луны:", e)
+
 # --- 6. ПОЛЗУНОК УСКОРЕНИЯ ВРЕМЕНИ ---
-# Создаем ползунок внизу экрана
 time_scale_slider = Slider(min=1, max=50, default=1, text='Ускорение времени', y=-0.45)
 time_label = Text(text='x1', position=(-0.1, -0.45), origin=(0, 0), scale=1.2, color=color.yellow)
 
 # --- 7. Вращение ---
 def update():
-    # Получаем текущее значение ползунка
     time_scale = time_scale_slider.value
     time_label.text = f"x{int(time_scale)}"
     
-    # Базовое время: 1 "игровой" день проходит за 0.05 секунды при скорости 1x
-    # При скорости 1x оборот Нептуна занимает около 50 минут.
     days_per_second = 20 * time_scale
     
     for p in planets:
-        # Вычисляем изменение угла в зависимости от периода планеты
-        # (Чем больше период, тем медленнее она движется)
         angle_change = (days_per_second / p.period) * 360 * time.dt
         p.angle += angle_change
         
-        # Движение по эллипсу
         p.x = math.cos(math.radians(p.angle)) * p.dist
         p.z = math.sin(math.radians(p.angle)) * (p.dist * 0.7) 
-        
-        # Поднимаем орбиту
         p.y = math.sin(math.radians(p.angle)) * (p.dist * 0.15) + 150
         
         p.rotation_y += 30 * time.dt
+
+    # === ВРАЩЕНИЕ ЛУНЫ ===
+    if moon:
+        moon.orbit_angle += (360 * time_scale * time.dt) * 0.5 
+        
+        moon.x = math.cos(math.radians(moon.orbit_angle)) * moon.orbit_radius
+        moon.z = math.sin(math.radians(moon.orbit_angle)) * moon.orbit_radius
 
 app.run()
